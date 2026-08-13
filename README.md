@@ -7,7 +7,8 @@ A classic Minesweeper game built in Rust using the Macroquad game engine.
 - Left click to reveal cell and interact with smiley face
 - Right click to place/remove flags
 - Custom-drawn graphics (no external assets, except font)
-- Embedded font for timer and flags counters
+- Embedded font for timer and flags counters: 
+    [Digit Tech](https://www.1001fonts.com/digit-tech-font.html) (Public Domain)
 
 ### Todo
 
