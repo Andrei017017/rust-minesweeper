@@ -21,7 +21,7 @@ A classic Minesweeper game built in Rust using the Macroquad game engine.
 ### Build and Run
 
 ```bash
-git clone https://github.com/yourusername/minesweeper.git
+git clone https://github.com/Andrei017017/rust-minesweeper.git
 cd minesweeper
 cargo run --release
 ```
