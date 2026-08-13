@@ -1,0 +1,13 @@
+# Rust build artifacts
+/target/
+
+digit-tech.zip
+DigitTech14-Regular.ttf
+DigitTech16-Regular.ttf
+
+.vscode/
+*.iml
+.idea/
+
+.DS_Store
+Thumbs.db
