@@ -2,7 +2,7 @@ use ::rand::rng;
 use ::rand::seq::index::sample;
 use macroquad::prelude::*;
 
-use crate::types::{Cell, Difficulty, GameState};
+use crate::types::Cell;
 use crate::game_config::GameConfig;
 use crate::constants::{DIRECTIONS, CELL_SIZE, OFFSET_X, OFFSET_Y, THICKNESS};
 
