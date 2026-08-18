@@ -21,6 +21,7 @@ async fn main() {
         clear_background(LIGHTGRAY);
 
         game.process_grid_click();
+        game.check_win();
 
         if game.state == GameState::Active {
             game.ui.update()
@@ -142,7 +143,7 @@ impl Game {
         }
     }
 
-    pub fn is_won(&mut self) {
+    pub fn check_win(&mut self) {
         // WIN CONDITION CHECK
         let total_safe_cells = (self.board.rows * self.board.cols) - self.board.mines;
         if self.board.revealed == total_safe_cells {
