@@ -35,13 +35,13 @@ async fn main() {
             game = Game::new(game.config)
         }
 
-        game.board.draw_grid(game.pressed_cell);
+        game.board.draw_grid(&game.pressed_cells);
 
         if game.ui.process_smiley_click() {
 
             game = Game::new(game.config)
         };
-        game.ui.draw_smiley_rect(&game.state, game.pressed_cell);
+        game.ui.draw_smiley_rect(&game.state, &game.pressed_cells);
 
         next_frame().await
     }
@@ -52,7 +52,8 @@ pub struct Game {
     ui: Ui,
     board: Board,
     state: GameState,
-    pressed_cell: Option<usize>
+    pressed_cells: Vec<usize>,
+    is_chording: bool
 }
 
 impl Game {
@@ -61,14 +62,16 @@ impl Game {
         let ui = Ui::new(&config);
         let board = Board::new(&config);
         let state = GameState::Active;
-        let pressed_cell = None;
+        let pressed_cells = Vec::new();
+        let is_chording = false;
 
         Self {
             config,
             ui,
             board,
             state,
-            pressed_cell
+            pressed_cells,
+            is_chording
         }
     }
 
@@ -79,20 +82,40 @@ impl Game {
         }
 
         let mouse_pos = mouse_position();
+        self.pressed_cells.clear();
 
-        if is_mouse_button_down(MouseButton::Left) {
-            // Remember which cell we are currently holding down
-            self.pressed_cell = self.board.get_cell_index(mouse_pos);
-        } else {
-            // Mouse is up, nothing is pressed
-            self.pressed_cell = None;
+        // DOWN Mouse buttons logic
+        // Check for Chording: Middle button OR (Left + Right)
+        if is_mouse_button_down(MouseButton::Middle) || (is_mouse_button_down(MouseButton::Left) && is_mouse_button_down(MouseButton::Right)) {
+                self.is_chording = true;
+            }
+
+        if let Some(current_index) = self.board.get_cell_index(mouse_pos) {
+
+            if self.is_chording {
+                // Visuals only: push the center cell and all its neighbors
+                self.pressed_cells.push(current_index);
+                self.pressed_cells.extend(self.board.get_neighbors(current_index));
+            } else if is_mouse_button_down(MouseButton::Left) {
+                self.pressed_cells.push(current_index);
+            } else {
+                // Mouse is off the grid, nothing should look pushed
+                self.pressed_cells.clear();
+            }
+        };
+        
+        if self.is_chording && (is_mouse_button_released(MouseButton::Middle) ||
+        (!is_mouse_button_down(MouseButton::Left) && !is_mouse_button_down(MouseButton::Right))) {
+            if let Some(released_index) = self.board.get_cell_index(mouse_pos) {
+                self.process_chord_logic(released_index);
+                self.is_chording = false
+            }
         }
-        if let Some(clicked) = self.board.get_cell_index(mouse_pos) {
-            if is_mouse_button_released(MouseButton::Left) {
+        else if is_mouse_button_released(MouseButton::Left) {
+            if let Some(released_index) = self.board.get_cell_index(mouse_pos) {
 
                 self.ui.init_timer();
-
-                let current_cell = self.board.grid[clicked].clone();
+                let current_cell = self.board.grid[released_index].clone();
 
                 match current_cell {
                     // 1. Unflagged Mine: BOOM. Game Over.
@@ -100,7 +123,7 @@ impl Game {
                         self.state = GameState::Lost;
                         
                         // 2. Now we can safely mutate because the borrow is gone!
-                        self.board.grid[clicked] = Cell::Mine(true);
+                        self.board.grid[released_index] = Cell::Mine(true);
 
                         // 3. Reveal the rest of the board
                         for cell in self.board.grid.iter_mut() {
@@ -120,25 +143,77 @@ impl Game {
                     },
                     // 2. Unflagged Safe Cell: Reveal it (and cascade if empty)
                     Cell::Hidden(false, None) => { 
-                        self.board.reveal_cells(clicked); 
+                        self.board.reveal_cells(released_index); 
                     },
                     // 3. Flagged cells, Revealed cells, or Game Over states: Do nothing
                     _ => {}
                 }
             };
-
-            if is_mouse_button_pressed(MouseButton::Right) {
-                match self.board.grid[clicked] {
+        }
+        else if is_mouse_button_pressed(MouseButton::Right) && !self.is_chording {
+            if let Some(released_index) = self.board.get_cell_index(mouse_pos) {
+                match self.board.grid[released_index] {
                     Cell::Hidden(is_mine, None) => {
-                        self.board.grid[clicked] = Cell::Hidden(is_mine, Some(self.board.flag_char));
+                        self.board.grid[released_index] = Cell::Hidden(is_mine, Some(self.board.flag_char));
                         self.ui.flags_left -= 1;
                     },
                     Cell::Hidden(is_mine, Some(_)) => {
-                        self.board.grid[clicked] = Cell::Hidden(is_mine, None);
+                        self.board.grid[released_index] = Cell::Hidden(is_mine, None);
                         self.ui.flags_left += 1;
                     },
                     _ => {} // Do nothing if already revealed
-                }            
+                }
+            }    
+        }
+    }
+
+    pub fn process_chord_logic(&mut self, released_index: usize) {
+
+        if let Cell::Revealed(Some(num)) = self.board.grid[released_index] {
+            let neighbours = self.board.get_neighbors(released_index);
+
+            // 1. Count how many flagged cells are around this number
+            let mut flags = 0;
+            for &neighbor_index in &neighbours {
+                if let Cell::Hidden(_, Some(_)) = self.board.grid[neighbor_index] {
+                    flags += 1;
+                }
+            }
+
+            // 2. If the flags match the number, reveal the unflagged neighbors
+            if flags == num {
+                for &neighbor_index in &neighbours {
+                    // Clone to satisfy the borrow checker, just like before
+                    let current_cell = self.board.grid[neighbor_index].clone();
+
+                    match current_cell {
+                        // BOOM! Hit an unflagged mine.
+                        Cell::Hidden(true, None) => {
+                            self.state = GameState::Lost;
+                            
+                            // Mark the specific mine we hit as the exploded one
+                            self.board.grid[neighbor_index] = Cell::Mine(true);
+
+                            // Reveal the rest of the board (reuse your existing logic!)
+                            for cell in self.board.grid.iter_mut() {
+                                match cell {
+                                    Cell::Hidden(true, None) => *cell = Cell::Mine(false),
+                                    Cell::Hidden(false, Some(_)) => *cell = Cell::WrongFlag,
+                                    _ => {}
+                                }
+                            }
+                            
+                            // CRITICAL: Stop processing further neighbors immediately!
+                            return; 
+                        },
+                        // Safe cell: Reveal it (this automatically handles cascading if it's a 0!)
+                        Cell::Hidden(false, None) => {
+                            self.board.reveal_cells(neighbor_index);
+                        },
+                        // Already revealed or correctly flagged: Do nothing
+                        _ => {}
+                    }
+                }
             }
         }
     }

@@ -136,7 +136,7 @@ impl Ui {
         return false;
     }
 
-    pub fn draw_smiley_rect(&self, state: &GameState, button_pushed: Option<usize>) {
+    pub fn draw_smiley_rect(&self, state: &GameState, cells_pushed: &Vec<usize>) {
         
             let x = self.smiley.x;
             let y = self.smiley.y;
@@ -175,7 +175,7 @@ impl Ui {
             GameState::Active => {
                 if self.pressed && is_hovered {
                     self.draw_scared_face();
-                } else if button_pushed.is_some() {
+                } else if !cells_pushed.is_empty() {
                     self.draw_scared_face();
                 } else {
                     self.draw_smiling_face();

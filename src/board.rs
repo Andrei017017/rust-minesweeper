@@ -42,7 +42,7 @@ impl Board {
         }
     }
 
-    pub fn draw_grid(&self, pressed_cell: Option<usize>) {
+    pub fn draw_grid(&self, pressed_cells: &Vec<usize>) {
         for i in 0..self.rows*self.cols {
             
             let row = (i / self.cols) as f32;
@@ -66,8 +66,8 @@ impl Board {
                         primary_color = WHITE;
                         secondary_color = DARKGRAY;
                     } else {
-                        // No flag. Drawn pushed if current i (Some(i)) is equal to pressed_cell (Some(index)) 
-                        let is_pushed = pressed_cell == Some(i);
+                        // No flag. Drawn pushed if current i in pressed_cells
+                        let is_pushed = pressed_cells.contains(&i);
                         
                         primary_color = if is_pushed { DARKGRAY } else { WHITE };
                         secondary_color = if is_pushed { WHITE } else { DARKGRAY };
@@ -390,5 +390,28 @@ impl Board {
                 }
             }
         }
+    }
+
+    pub fn get_neighbors(&self, index: usize) -> Vec<usize> {
+        let mut neighbors = Vec::with_capacity(8);
+        let row = (index / self.cols) as i32;
+        let col = (index % self.cols) as i32;
+
+        for r_offset in -1..=1 {
+            for c_offset in -1..=1 {
+                if r_offset == 0 && c_offset == 0 {
+                    continue; // Skip the center cell itself
+                }
+
+                let n_row = row + r_offset;
+                let n_col = col + c_offset;
+
+                if n_row >= 0 && n_row < self.rows as i32 
+                && n_col >= 0 && n_col < self.cols as i32 {
+                    neighbors.push((n_row * self.cols as i32 + n_col) as usize);
+                }
+            }
+        }
+        neighbors
     }
 }
