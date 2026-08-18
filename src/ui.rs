@@ -136,7 +136,7 @@ impl Ui {
         return false;
     }
 
-    pub fn draw_smiley_rect(&self, state: &GameState) {
+    pub fn draw_smiley_rect(&self, state: &GameState, button_pushed: Option<usize>) {
         
             let x = self.smiley.x;
             let y = self.smiley.y;
@@ -146,7 +146,7 @@ impl Ui {
             let primary_color;
             let secondary_color;
 
-            let mouse_pos= mouse_position().into();
+            let mouse_pos = mouse_position().into();
             let is_hovered = self.smiley.contains(mouse_pos);
 
             if self.pressed && is_hovered {
@@ -174,6 +174,8 @@ impl Ui {
         match state {
             GameState::Active => {
                 if self.pressed && is_hovered {
+                    self.draw_scared_face();
+                } else if button_pushed.is_some() {
                     self.draw_scared_face();
                 } else {
                     self.draw_smiling_face();

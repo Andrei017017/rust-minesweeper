@@ -12,7 +12,7 @@ A classic Minesweeper game built in Rust using the Macroquad game engine.
 
 ### Todo
 
-- Add mouse down/released for grid interaction
+- Add mouse down/released for grid interaction (Done)
 - Add chording
 
 ### Prerequisites

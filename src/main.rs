@@ -20,9 +20,7 @@ async fn main() {
     loop {
         clear_background(LIGHTGRAY);
 
-        if let Some(mouse_button) = game.get_pressed_mouse_button() {
-            game.process_grid_click(mouse_button)
-        }
+        game.process_grid_click();
 
         if game.state == GameState::Active {
             game.ui.update()
@@ -36,13 +34,13 @@ async fn main() {
             game = Game::new(game.config)
         }
 
-        game.board.draw_grid();
+        game.board.draw_grid(game.pressed_cell);
 
         if game.ui.process_smiley_click() {
 
             game = Game::new(game.config)
         };
-        game.ui.draw_smiley_rect(&game.state);
+        game.ui.draw_smiley_rect(&game.state, game.pressed_cell);
 
         next_frame().await
     }
@@ -52,8 +50,8 @@ pub struct Game {
     config: GameConfig,
     ui: Ui,
     board: Board,
-    start_time: f64,
-    state: GameState
+    state: GameState,
+    pressed_cell: Option<usize>
 }
 
 impl Game {
@@ -61,32 +59,19 @@ impl Game {
         let config = config;
         let ui = Ui::new(&config);
         let board = Board::new(&config);
-        let start_time = 0.0;
         let state = GameState::Active;
+        let pressed_cell = None;
 
         Self {
             config,
             ui,
             board,
-            start_time,
-            state
+            state,
+            pressed_cell
         }
     }
 
-    pub fn get_pressed_mouse_button(&self) -> Option<MouseButton> {
-        if is_mouse_button_pressed(MouseButton::Left) {
-            return Some(MouseButton::Left);
-        }
-        if is_mouse_button_pressed(MouseButton::Right) {
-            return Some(MouseButton::Right);
-        }
-        if is_mouse_button_pressed(MouseButton::Middle) {
-            return Some(MouseButton::Middle);
-        }
-        None
-    }
-
-    pub fn process_grid_click(&mut self, mouse_button: MouseButton) {
+    pub fn process_grid_click(&mut self) {
 
         if self.state != GameState::Active {
             return
@@ -94,62 +79,65 @@ impl Game {
 
         let mouse_pos = mouse_position();
 
+        if is_mouse_button_down(MouseButton::Left) {
+            // Remember which cell we are currently holding down
+            self.pressed_cell = self.board.get_cell_index(mouse_pos);
+        } else {
+            // Mouse is up, nothing is pressed
+            self.pressed_cell = None;
+        }
         if let Some(clicked) = self.board.get_cell_index(mouse_pos) {
+            if is_mouse_button_released(MouseButton::Left) {
 
-            match mouse_button {
-                MouseButton::Left => {
-                    self.ui.init_timer();
-                    if self.start_time == 0.0 {
-                        self.start_time = macroquad::time::get_time();
-                    }
-                    let current_cell = self.board.grid[clicked].clone();
+                self.ui.init_timer();
 
-                    match current_cell {
-                        // 1. Unflagged Mine: BOOM. Game Over.
-                        Cell::Hidden(true, None) => {
-                            self.state = GameState::Lost;
-                            
-                            // 2. Now we can safely mutate because the borrow is gone!
-                            self.board.grid[clicked] = Cell::Mine(true);
+                let current_cell = self.board.grid[clicked].clone();
 
-                            // 3. Reveal the rest of the board
-                            for cell in self.board.grid.iter_mut() {
-                                match cell {
-                                    // Unflagged mine -> Reveal it
-                                    Cell::Hidden(true, None) => {
-                                        *cell = Cell::Mine(false);
-                                    }
-                                    // Safe cell with a flag -> Mark as wrong
-                                    Cell::Hidden(false, Some(_)) => {
-                                        *cell = Cell::WrongFlag;
-                                    }
-                                    // Correctly flagged mine OR already revealed -> Do nothing
-                                    _ => {}
+                match current_cell {
+                    // 1. Unflagged Mine: BOOM. Game Over.
+                    Cell::Hidden(true, None) => {
+                        self.state = GameState::Lost;
+                        
+                        // 2. Now we can safely mutate because the borrow is gone!
+                        self.board.grid[clicked] = Cell::Mine(true);
+
+                        // 3. Reveal the rest of the board
+                        for cell in self.board.grid.iter_mut() {
+                            match cell {
+                                // Unflagged mine -> Reveal it
+                                Cell::Hidden(true, None) => {
+                                    *cell = Cell::Mine(false);
                                 }
+                                // Safe cell with a flag -> Mark as wrong
+                                Cell::Hidden(false, Some(_)) => {
+                                    *cell = Cell::WrongFlag;
+                                }
+                                // Correctly flagged mine OR already revealed -> Do nothing
+                                _ => {}
                             }
-                        },
-                        // 2. Unflagged Safe Cell: Reveal it (and cascade if empty)
-                        Cell::Hidden(false, None) => { 
-                            self.board.reveal_cells(clicked); 
-                        },
-                        // 3. Flagged cells, Revealed cells, or Game Over states: Do nothing
-                        _ => {}
-                    }
-                },
-                MouseButton::Right => {
-                    match self.board.grid[clicked] {
-                        Cell::Hidden(is_mine, None) => {
-                            self.board.grid[clicked] = Cell::Hidden(is_mine, Some(self.board.flag_char));
-                            self.ui.flags_left -= 1;
-                        },
-                        Cell::Hidden(is_mine, Some(_)) => {
-                            self.board.grid[clicked] = Cell::Hidden(is_mine, None);
-                            self.ui.flags_left += 1;
-                        },
-                        _ => {} // Do nothing if already revealed
-                    }
-                },
-                _ => ()
+                        }
+                    },
+                    // 2. Unflagged Safe Cell: Reveal it (and cascade if empty)
+                    Cell::Hidden(false, None) => { 
+                        self.board.reveal_cells(clicked); 
+                    },
+                    // 3. Flagged cells, Revealed cells, or Game Over states: Do nothing
+                    _ => {}
+                }
+            };
+
+            if is_mouse_button_pressed(MouseButton::Right) {
+                match self.board.grid[clicked] {
+                    Cell::Hidden(is_mine, None) => {
+                        self.board.grid[clicked] = Cell::Hidden(is_mine, Some(self.board.flag_char));
+                        self.ui.flags_left -= 1;
+                    },
+                    Cell::Hidden(is_mine, Some(_)) => {
+                        self.board.grid[clicked] = Cell::Hidden(is_mine, None);
+                        self.ui.flags_left += 1;
+                    },
+                    _ => {} // Do nothing if already revealed
+                }            
             }
         }
     }

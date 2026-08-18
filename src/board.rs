@@ -42,7 +42,7 @@ impl Board {
         }
     }
 
-    pub fn draw_grid(&self) {
+    pub fn draw_grid(&self, pressed_cell: Option<usize>) {
         for i in 0..self.rows*self.cols {
             
             let row = (i / self.cols) as f32;
@@ -60,14 +60,19 @@ impl Board {
 
             match self.grid[i] {
                 Cell::Hidden(_, option) => {
-                    primary_color = WHITE;
-                    secondary_color = DARKGRAY;
-
-                    if let Some(_) = option {
-                        flag_exists = true
+                    if option.is_some() {
+                        // It has a flag. Always drawn not pushed
+                        flag_exists = true;
+                        primary_color = WHITE;
+                        secondary_color = DARKGRAY;
+                    } else {
+                        // No flag. Drawn pushed if current i (Some(i)) is equal to pressed_cell (Some(index)) 
+                        let is_pushed = pressed_cell == Some(i);
+                        
+                        primary_color = if is_pushed { DARKGRAY } else { WHITE };
+                        secondary_color = if is_pushed { WHITE } else { DARKGRAY };
                     }
-                }
-
+                },
                 Cell::Revealed(None) => {
                     primary_color = DARKGRAY;
                     secondary_color =  WHITE;
