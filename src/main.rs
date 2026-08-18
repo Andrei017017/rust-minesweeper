@@ -111,7 +111,7 @@ impl Game {
                 self.is_chording = false
             }
         }
-        else if is_mouse_button_released(MouseButton::Left) {
+        else if is_mouse_button_released(MouseButton::Left) && !self.is_chording {
             if let Some(released_index) = self.board.get_cell_index(mouse_pos) {
 
                 self.ui.init_timer();
